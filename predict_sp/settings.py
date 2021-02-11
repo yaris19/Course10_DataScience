@@ -18,7 +18,6 @@ FEATURES_AMINO_ACIDS = {
     "T": 16,
     "V": 17,
     "W": 18,
-    "Y": 19
+    "Y": 19,
 }
-FEATURE_LENGTH = 70
-FEATURES_NAMES = [f"F{i + 1}" for i in range(FEATURE_LENGTH)]
+FEATURE_LENGTH = 50
