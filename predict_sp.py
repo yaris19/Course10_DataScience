@@ -46,10 +46,7 @@ def get_data(seqs):
         if len(seq) >= FEATURE_LENGTH:
             for i in range(FEATURE_LENGTH):
                 feature.extend(one_hot_encode(seq[i]))
-
             features.append(feature)
-        else:
-            print(len(seq))
 
     return features, labels
 
@@ -109,13 +106,13 @@ def print_performance(svc, features_benchmark, predicted_labels,
 
 
 if __name__ == "__main__":
-    # seqs_train = read_fasta("./input/train_set.fasta")
-    # features_train, labels_train = get_data(seqs_train)
-    # svc = train(features_train, labels_train)
-    #
-    # file_name = save_classifier(svc)
+    seqs_train = read_fasta("./input/train_set.fasta")
+    features_train, labels_train = get_data(seqs_train)
+    svc = train(features_train, labels_train)
 
-    file_name = f"./output/classifier_{FEATURE_LENGTH}.pkl"
+    file_name = save_classifier(svc)
+
+    # file_name = f"./output/classifier_{FEATURE_LENGTH}.pkl"
     svc = load_classifier(file_name)
 
     seqs_bechmark = read_fasta("./input/benchmark_set.fasta")
