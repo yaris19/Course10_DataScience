@@ -1,16 +1,77 @@
-import pickle
+import argparse
+import logging
+import os
 
-import matplotlib.pyplot as plt
 import numpy as np
-from sklearn import svm, metrics
+from sklearn import svm
+from sklearn.ensemble import RandomForestClassifier
 
-from predict_sp.settings import FEATURES_AMINO_ACIDS, FEATURE_LENGTH
+from prediction.classifier import Classifier
+from prediction.custom_formatter import CustomFormatter
+from prediction.settings import FEATURES_AMINO_ACIDS
+
+parser = argparse.ArgumentParser(
+    description="Predict singnal peptides on protein sequences")
+parser.add_argument("--train-set", dest="train_set",
+                    type=str, required=True,
+                    help="path to training data set")
+parser.add_argument("--test-set", dest="test_set", type=str,
+                    required=True, help="path to test data set")
+parser.add_argument("--out-dir", dest="out_dir", type=str, required=True,
+                    help="path to output dir")
+parser.add_argument("--classifier", dest="classifier", type=str, required=True,
+                    help="sklearn classifier")
+parser.add_argument("--trained-model", dest="trained_model",
+                    type=str,
+                    help="path to a trained model set")
+parser.add_argument("--number-features", dest="feature_length", required=True,
+                    type=int, help="number of features that need to be used")
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+
+ch.setFormatter(CustomFormatter())
+logger.addHandler(ch)
+
+CLASSIFIERS = {
+    "svc": svm.SVC(kernel="linear"),
+    "randomforestclassifier": RandomForestClassifier(n_jobs=-1,
+                                                     random_state=0,
+                                                     max_depth=2),
+    "rfc": RandomForestClassifier(n_jobs=-1,
+                                  random_state=0,
+                                  max_depth=2)
+}
 
 
-# TODO: make nice class so different classifiers can be used
+def parse_args(parser):
+    args = parser.parse_args()
 
-def read_fasta(file):
-    print("Reading fasta file")
+    if not os.path.exists(args.train_set):
+        raise FileNotFoundError(f"{args.train_set} does not exist")
+
+    if not os.path.exists(args.test_set):
+        raise FileNotFoundError(f"{args.test_set} does not exist")
+
+    if not args.classifier and not os.path.exists(args.trained_model):
+        raise FileNotFoundError(f"{args.trained_model} does not exist")
+
+    if not args.trained_model and args.classifier.lower() not in CLASSIFIERS:
+        avail_classifiers = ', '.join(list(CLASSIFIERS.keys()))
+        raise ValueError(
+            f"Choose one of the following classifiers: {avail_classifiers}")
+
+    if not os.path.exists(args.out_dir):
+        os.mkdir(args.out_dir)
+        logger.info(f"Created directory: {args.out_dir}")
+
+    return args
+
+
+def read_fasta(file, feature_length):
+    logger.debug("Reading fasta file")
     seqs = []
     with open(file, "r") as f:
         lines = f.readlines()
@@ -18,10 +79,10 @@ def read_fasta(file):
             if line.startswith(">"):
                 header = line.strip()
                 classification = header.split("|")[2]
-                seq = lines[i + 1].strip()[:FEATURE_LENGTH]
+                seq = lines[i + 1].strip()[:feature_length]
 
                 # only get the sequences that meet the length requirement
-                if len(seq) == FEATURE_LENGTH:
+                if len(seq) == feature_length:
                     seqs.append((seq, classification))
     return seqs
 
@@ -35,88 +96,55 @@ def one_hot_encode(aa):
     return np.array(feature)
 
 
-def get_data(seqs):
-    print("Getting the data")
+def get_data(seqs, feature_length):
+    logger.debug("Getting the data")
     features = []
     labels = []
     for info in seqs:
         seq = info[0]
         labels.append(info[1])
         feature = []
-        if len(seq) >= FEATURE_LENGTH:
-            for i in range(FEATURE_LENGTH):
+        if len(seq) >= feature_length:
+            for i in range(feature_length):
                 feature.extend(one_hot_encode(seq[i]))
             features.append(feature)
 
     return features, labels
 
 
-def save_classifier(svc):
-    print("Saving classifier")
-    file_name = f"./output/classifier_{FEATURE_LENGTH}.pkl"
-    with open(file_name, "wb") as f:
-        pickle.dump(svc, f)
-    return file_name
-
-
-def load_classifier(file_name):
-    print("Loading classifier")
-    with open(file_name, "rb") as f:
-        classifier = pickle.load(f)
+def get_classifier(features_train, labels_train, features_benchmark,
+                   labels_benchmark, args):
+    if args.feature_length:
+        classifier = Classifier(features_train, labels_train,
+                                features_benchmark,
+                                labels_benchmark, args.out_dir,
+                                CLASSIFIERS.get(args.classifier.lower()),
+                                feature_length=args.feature_length)
+    else:
+        classifier = Classifier(features_train, labels_train,
+                                features_benchmark,
+                                labels_benchmark, args.out_dir,
+                                CLASSIFIERS.get(args.classifer.lower()))
     return classifier
 
 
-def train(x, y):
-    print("Training the model")
-    svc = svm.SVC(kernel="linear")
-    svc.fit(x, y)
-    return svc
-
-
-def predict(svc, x):
-    print("Predicting")
-    return svc.predict(x)
-
-
-def print_performance(svc, features_benchmark, predicted_labels,
-                      actual_labels):
-    score = svc.score(features_benchmark, actual_labels)
-    print("=" * 60)
-    print("\nScore:", score)
-
-    print("\nResult overview:\n")
-    classification_report = metrics.classification_report(actual_labels,
-                                                          predicted_labels)
-    print(classification_report)
-    with open(f"./output/classification_report_{FEATURE_LENGTH}.txt",
-              "w") as f:
-        f.write(classification_report)
-
-    disp = metrics.plot_confusion_matrix(svc, features_benchmark,
-                                         actual_labels)
-
-    print("\nConfusion matrix:\n")
-    print(disp.confusion_matrix)
-
-    disp.ax_.set_title(
-        f"Confusion matrix with sequence length {FEATURE_LENGTH}")
-    plt.savefig(f"./output/confusion_matrix_{FEATURE_LENGTH}.png",
-                bbox_inches="tight")
-    plt.show()
-
-
 if __name__ == "__main__":
-    seqs_train = read_fasta("./input/train_set.fasta")
-    features_train, labels_train = get_data(seqs_train)
-    svc = train(features_train, labels_train)
+    args = parse_args(parser)
 
-    file_name = save_classifier(svc)
+    seqs_train = read_fasta(args.train_set, args.feature_length)
+    features_train, labels_train = get_data(seqs_train, args.feature_length)
+    seqs_bechmark = read_fasta(args.test_set, args.feature_length)
+    features_benchmark, labels_benchmark = get_data(seqs_bechmark,
+                                                    args.feature_length)
 
-    # file_name = f"./output/classifier_{FEATURE_LENGTH}.pkl"
-    svc = load_classifier(file_name)
+    classifier = get_classifier(features_train, labels_train,
+                                features_benchmark, labels_benchmark, args)
 
-    seqs_bechmark = read_fasta("./input/benchmark_set.fasta")
-    features_benchmark, labels_benchmark = get_data(seqs_bechmark)
-    predictions = predict(svc, features_benchmark)
+    if args.trained_model:
+        classifier.load_classifier(args.trained_model)
+    else:
+        classifier.train()
 
-    print_performance(svc, features_benchmark, predictions, labels_benchmark)
+    classifier.predict()
+    classifier.print_performance_and_save()
+    classifier.plot_confusion_matrix_and_save()

@@ -20,4 +20,3 @@ FEATURES_AMINO_ACIDS = {
     "W": 18,
     "Y": 19,
 }
-FEATURE_LENGTH = 50
