@@ -11,7 +11,7 @@ from prediction.custom_formatter import CustomFormatter
 from prediction.settings import FEATURES_AMINO_ACIDS
 
 parser = argparse.ArgumentParser(
-    description="Predict singnal peptides on protein sequences")
+    description="Predict singnal peptides for protein sequences")
 parser.add_argument("--train-set", dest="train_set",
                     type=str, required=True,
                     help="path to training data set")
