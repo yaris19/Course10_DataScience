@@ -8,7 +8,7 @@ The arguments used for the classifiers:
 
 
 ### Usage
-```bash
+```text
 usage: predict_sp.py [-h] --train-set TRAIN_SET --test-set TEST_SET --out-dir OUT_DIR --classifier CLASSIFIER [--trained-model TRAINED_MODEL]
                      --number-features FEATURE_LENGTH
 

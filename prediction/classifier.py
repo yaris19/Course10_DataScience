@@ -28,13 +28,19 @@ class Classifier:
         self.classifier = classifier
         self.predictions = None
         self.classification_report = None
+
         self.name = self.classifier.__class__.__name__
         self.out_dir = os.path.join(out_dir, self.name)
-        self.init_out_dir()
+        self.models_dir = os.path.join("models", self.name)
 
-    def init_out_dir(self):
+        self.init_dirs()
+
+    def init_dirs(self):
         if not os.path.exists(self.out_dir):
             os.mkdir(self.out_dir)
+
+        if not os.path.exists(self.models_dir):
+            os.mkdir(self.models_dir)
 
     def train(self):
         logger.debug("Training the model")
@@ -51,7 +57,9 @@ class Classifier:
 
         self.classification_report = metrics.classification_report(
             self.test_labels,
-            self.predictions)
+            self.predictions,
+            zero_division=0)
+
         logger.info("Classification report:")
         logger.info(f"\n{self.classification_report}")
         self.__save_classification_report()
@@ -79,13 +87,14 @@ class Classifier:
             f.write(self.classification_report)
 
     def save_classifier(self):
-        logger.debug("Saving classifier")
-        file_name = f"{self.out_dir}/classifier_{self.feature_length}.pkl"
+        file_name = os.path.join(self.models_dir,
+                                 f"classifier_{self.feature_length}.pkl")
+        logger.info(f"Saving classifier {file_name}")
         with open(file_name, "wb") as f:
             pickle.dump(self.classifier, f)
 
     def load_classifier(self, file_name):
-        logger.debug("Loading classifier")
+        logger.info(f"Loading classifier {file_name}")
         with open(file_name, "rb") as f:
             self.classifier = pickle.load(f)
 

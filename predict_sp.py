@@ -144,6 +144,7 @@ if __name__ == "__main__":
         classifier.load_classifier(args.trained_model)
     else:
         classifier.train()
+        classifier.save_classifier()
 
     classifier.predict()
     classifier.print_performance_and_save()
