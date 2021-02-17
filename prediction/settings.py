@@ -1,3 +1,5 @@
+import logging
+
 FEATURES_AMINO_ACIDS = {
     "A": 0,
     "C": 1,
@@ -20,3 +22,5 @@ FEATURES_AMINO_ACIDS = {
     "W": 18,
     "Y": 19,
 }
+
+LOGGING_LEVEL = logging.DEBUG

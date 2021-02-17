@@ -5,10 +5,12 @@ import os
 import numpy as np
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
 
 from prediction.classifier import Classifier
 from prediction.custom_formatter import CustomFormatter
-from prediction.settings import FEATURES_AMINO_ACIDS
+from prediction.settings import FEATURES_AMINO_ACIDS, LOGGING_LEVEL
 
 parser = argparse.ArgumentParser(
     description="Predict singnal peptides for protein sequences")
@@ -28,22 +30,29 @@ parser.add_argument("--number-features", dest="feature_length", required=True,
                     type=int, help="number of features that need to be used")
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(LOGGING_LEVEL)
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(LOGGING_LEVEL)
 
 ch.setFormatter(CustomFormatter())
 logger.addHandler(ch)
 
 CLASSIFIERS = {
     "svc": svm.SVC(kernel="linear"),
-    "randomforestclassifier": RandomForestClassifier(n_jobs=-1,
-                                                     random_state=0,
-                                                     max_depth=2),
     "rfc": RandomForestClassifier(n_jobs=-1,
                                   random_state=0,
-                                  max_depth=2)
+                                  max_depth=2),
+    "knc": KNeighborsClassifier(n_neighbors=3,
+                                n_jobs=-1),
+    "gnb": GaussianNB()
 }
+
+AVAIL_CLASSIFIERS = [
+    "'svc' (C-Support Vector Classification)",
+    "'rfc' (RandomForestClassifier)",
+    "'knc' (KNeighborsClassifier)",
+    "'gnb' (GaussianNB)"
+]
 
 
 def parse_args(parser):
@@ -59,7 +68,7 @@ def parse_args(parser):
         raise FileNotFoundError(f"{args.trained_model} does not exist")
 
     if not args.trained_model and args.classifier.lower() not in CLASSIFIERS:
-        avail_classifiers = ', '.join(list(CLASSIFIERS.keys()))
+        avail_classifiers = ', '.join(AVAIL_CLASSIFIERS)
         raise ValueError(
             f"Choose one of the following classifiers: {avail_classifiers}")
 
@@ -114,18 +123,11 @@ def get_data(seqs, feature_length):
 
 def get_classifier(features_train, labels_train, features_benchmark,
                    labels_benchmark, args):
-    if args.feature_length:
-        classifier = Classifier(features_train, labels_train,
-                                features_benchmark,
-                                labels_benchmark, args.out_dir,
-                                CLASSIFIERS.get(args.classifier.lower()),
-                                feature_length=args.feature_length)
-    else:
-        classifier = Classifier(features_train, labels_train,
-                                features_benchmark,
-                                labels_benchmark, args.out_dir,
-                                CLASSIFIERS.get(args.classifer.lower()))
-    return classifier
+    return Classifier(features_train, labels_train,
+                      features_benchmark,
+                      labels_benchmark, args.out_dir,
+                      CLASSIFIERS.get(args.classifier.lower()),
+                      feature_length=args.feature_length)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,10 @@
+              precision    recall  f1-score   support
+
+        LIPO       0.55      0.81      0.66       657
+       NO_SP       0.99      0.73      0.84      7579
+          SP       0.28      0.34      0.31       375
+         TAT       0.10      0.94      0.18       194
+
+    accuracy                           0.72      8805
+   macro avg       0.48      0.70      0.50      8805
+weighted avg       0.91      0.72      0.79      8805

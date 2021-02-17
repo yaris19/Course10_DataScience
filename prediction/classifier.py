@@ -6,11 +6,12 @@ import matplotlib.pyplot as plt
 from sklearn import metrics
 
 from .custom_formatter import CustomFormatter
+from .settings import LOGGING_LEVEL
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(LOGGING_LEVEL)
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(LOGGING_LEVEL)
 
 ch.setFormatter(CustomFormatter())
 logger.addHandler(ch)
@@ -29,11 +30,13 @@ class Classifier:
         self.predictions = None
         self.classification_report = None
 
-        self.name = self.classifier.__class__.__name__
-        self.out_dir = os.path.join(out_dir, self.name)
-        self.models_dir = os.path.join("models", self.name)
+        self.classifier_name = self.classifier.__class__.__name__
+        self.out_dir = os.path.join(out_dir, self.classifier_name)
+        self.models_dir = os.path.join("models", self.classifier_name)
 
         self.init_dirs()
+
+        logger.info(f"Using classifier {self.classifier_name}")
 
     def init_dirs(self):
         if not os.path.exists(self.out_dir):
@@ -44,10 +47,15 @@ class Classifier:
 
     def train(self):
         logger.debug("Training the model")
+
+        nr_samples = len(self.get_train_labels())
+        logger.info(f"Number of samples in the training dataset: {nr_samples}")
         self.classifier.fit(self.train_data, self.train_labels)
 
     def predict(self):
         logger.debug("Predicting")
+        nr_samples = len(self.get_test_labels())
+        logger.info(f"Number of samples in the testing dataset: {nr_samples}")
         self.predictions = self.classifier.predict(self.test_data)
 
     def print_performance_and_save(self):
