@@ -5,12 +5,13 @@ import os
 import numpy as np
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
 
 from prediction.classifier import Classifier
 from prediction.custom_formatter import CustomFormatter
-from prediction.settings import FEATURES_AMINO_ACIDS, LOGGING_LEVEL
+from prediction.settings import LOGGING_LEVEL, POSITIONS_AMINO_ACIDS, \
+    FEATURES_AMINO_ACIDS, FEATURES_AMINO_ACIDS_LENGTH
 
 parser = argparse.ArgumentParser(
     description="Predict singnal peptides for protein sequences")
@@ -28,6 +29,9 @@ parser.add_argument("--trained-model", dest="trained_model",
                     help="path to a trained model set")
 parser.add_argument("--number-features", dest="feature_length", required=True,
                     type=int, help="number of features that need to be used")
+parser.add_argument("--classify-features", dest="classify_features",
+                    action="store_true", default=False,
+                    help="train based on the features of an amino acid")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL)
@@ -96,8 +100,17 @@ def read_fasta(file, feature_length):
     return seqs
 
 
-def one_hot_encode(aa):
-    feature = [0] * len(FEATURES_AMINO_ACIDS)
+def one_hot_encode_position(aa):
+    feature = [0] * len(POSITIONS_AMINO_ACIDS)
+    if not aa:
+        return np.array(feature)
+
+    feature[POSITIONS_AMINO_ACIDS[aa]] = 1
+    return np.array(feature)
+
+
+def one_hot_encode_feature(aa):
+    feature = [0] * FEATURES_AMINO_ACIDS_LENGTH
     if not aa:
         return np.array(feature)
 
@@ -105,7 +118,7 @@ def one_hot_encode(aa):
     return np.array(feature)
 
 
-def get_data(seqs, feature_length):
+def get_data(seqs, feature_length, classify_features):
     logger.debug("Getting the data")
     features = []
     labels = []
@@ -115,7 +128,10 @@ def get_data(seqs, feature_length):
         feature = []
         if len(seq) >= feature_length:
             for i in range(feature_length):
-                feature.extend(one_hot_encode(seq[i]))
+                if classify_features:
+                    feature.extend(one_hot_encode_feature(seq[i]))
+                else:
+                    feature.extend(one_hot_encode_position(seq[i]))
             features.append(feature)
 
     return features, labels
@@ -127,6 +143,7 @@ def get_classifier(features_train, labels_train, features_benchmark,
                       features_benchmark,
                       labels_benchmark, args.out_dir,
                       CLASSIFIERS.get(args.classifier.lower()),
+                      args.classify_features,
                       feature_length=args.feature_length)
 
 
@@ -134,10 +151,12 @@ if __name__ == "__main__":
     args = parse_args(parser)
 
     seqs_train = read_fasta(args.train_set, args.feature_length)
-    features_train, labels_train = get_data(seqs_train, args.feature_length)
+    features_train, labels_train = get_data(seqs_train, args.feature_length,
+                                            args.classify_features)
     seqs_bechmark = read_fasta(args.test_set, args.feature_length)
     features_benchmark, labels_benchmark = get_data(seqs_bechmark,
-                                                    args.feature_length)
+                                                    args.feature_length,
+                                                    args.classify_features)
 
     classifier = get_classifier(features_train, labels_train,
                                 features_benchmark, labels_benchmark, args)

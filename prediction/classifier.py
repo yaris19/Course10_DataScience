@@ -20,19 +20,27 @@ logger.addHandler(ch)
 class Classifier:
 
     def __init__(self, train_data, train_labels, test_data, test_labels,
-                 out_dir, classifier=None, feature_length=50):
+                 out_dir, classifier, classify_features, feature_length=50):
         self.train_data = train_data
         self.train_labels = train_labels
         self.test_data = test_data
         self.test_labels = test_labels
-        self.feature_length = feature_length
+        self.classify_features = classify_features
         self.classifier = classifier
+        self.feature_length = feature_length
+
         self.predictions = None
         self.classification_report = None
 
+        self.subfolder = "features" if self.classify_features else "positions"
+
         self.classifier_name = self.classifier.__class__.__name__
-        self.out_dir = os.path.join(out_dir, self.classifier_name)
-        self.models_dir = os.path.join("models", self.classifier_name)
+        self.out_dir = os.path.join(out_dir,
+                                    self.subfolder,
+                                    self.classifier_name)
+        self.models_dir = os.path.join("models",
+                                       self.subfolder,
+                                       self.classifier_name)
 
         self.init_dirs()
 
@@ -40,14 +48,13 @@ class Classifier:
 
     def init_dirs(self):
         if not os.path.exists(self.out_dir):
-            os.mkdir(self.out_dir)
+            os.makedirs(self.out_dir)
 
         if not os.path.exists(self.models_dir):
-            os.mkdir(self.models_dir)
+            os.makedirs(self.models_dir)
 
     def train(self):
         logger.debug("Training the model")
-
         nr_samples = len(self.get_train_labels())
         logger.info(f"Number of samples in the training dataset: {nr_samples}")
         self.classifier.fit(self.train_data, self.train_labels)
