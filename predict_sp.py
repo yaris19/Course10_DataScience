@@ -5,6 +5,7 @@ import os
 import numpy as np
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -18,8 +19,6 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--train-set", dest="train_set",
                     type=str, required=True,
                     help="path to training data set")
-parser.add_argument("--test-set", dest="test_set", type=str,
-                    required=True, help="path to test data set")
 parser.add_argument("--out-dir", dest="out_dir", type=str, required=True,
                     help="path to output dir")
 parser.add_argument("--classifier", dest="classifier", type=str, required=True,
@@ -65,9 +64,6 @@ def parse_args(parser):
     if not os.path.exists(args.train_set):
         raise FileNotFoundError(f"{args.train_set} does not exist")
 
-    if not os.path.exists(args.test_set):
-        raise FileNotFoundError(f"{args.test_set} does not exist")
-
     if not args.classifier and not os.path.exists(args.trained_model):
         raise FileNotFoundError(f"{args.trained_model} does not exist")
 
@@ -92,11 +88,12 @@ def read_fasta(file, feature_length):
             if line.startswith(">"):
                 header = line.strip()
                 classification = header.split("|")[2]
-                seq = lines[i + 1].strip()[:feature_length]
+                if classification in ["NO_SP", "SP"]:
+                    seq = lines[i + 1].strip()[:feature_length]
 
-                # only get the sequences that meet the length requirement
-                if len(seq) == feature_length:
-                    seqs.append((seq, classification))
+                    # only get the sequences that meet the length requirement
+                    if len(seq) == feature_length:
+                        seqs.append((seq, classification))
     return seqs
 
 
@@ -151,15 +148,14 @@ if __name__ == "__main__":
     args = parse_args(parser)
 
     seqs_train = read_fasta(args.train_set, args.feature_length)
-    features_train, labels_train = get_data(seqs_train, args.feature_length,
-                                            args.classify_features)
-    seqs_bechmark = read_fasta(args.test_set, args.feature_length)
-    features_benchmark, labels_benchmark = get_data(seqs_bechmark,
-                                                    args.feature_length,
-                                                    args.classify_features)
+    features, labels = get_data(seqs_train, args.feature_length,
+                                args.classify_features)
+
+    features_train, features_test, labels_train, labels_test = \
+        train_test_split(features, labels, test_size=.2)
 
     classifier = get_classifier(features_train, labels_train,
-                                features_benchmark, labels_benchmark, args)
+                                features_test, labels_test, args)
 
     if args.trained_model:
         classifier.load_classifier(args.trained_model)
@@ -169,4 +165,5 @@ if __name__ == "__main__":
 
     classifier.predict()
     classifier.print_performance_and_save()
-    classifier.plot_confusion_matrix_and_save()
+    classifier.plot_confusion_matrix_and_save(plot_for="train")
+    classifier.plot_confusion_matrix_and_save(plot_for="test")

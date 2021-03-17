@@ -79,18 +79,28 @@ class Classifier:
         logger.info(f"\n{self.classification_report}")
         self.__save_classification_report()
 
-    def plot_confusion_matrix_and_save(self):
+    def plot_confusion_matrix_and_save(self, plot_for):
         logger.debug("Calculating confusion matrix")
-        disp = metrics.plot_confusion_matrix(self.classifier,
-                                             self.test_data,
-                                             self.test_labels)
+        plot_for = plot_for.lower()
+        if plot_for == "train":
+            disp = metrics.plot_confusion_matrix(self.classifier,
+                                                 self.train_data,
+                                                 self.train_labels)
+        elif plot_for == "test":
+            disp = metrics.plot_confusion_matrix(self.classifier,
+                                                 self.test_data,
+                                                 self.test_labels)
+        else:
+            raise Exception("Param 'plot_for' can only be 'train' or 'test'")
+
         logger.info("Confusion matrix:")
         logger.info(f"\n{disp.confusion_matrix}")
         disp.ax_.set_title(
-            f"Confusion matrix with sequence length {self.feature_length}")
+            f"Confusion matrix with sequence length {self.feature_length} "
+            f"for {plot_for} data")
         plt.savefig(os.path.join(
             self.out_dir,
-            f"confusion_matrix_{self.feature_length}.png"),
+            f"confusion_matrix_{self.feature_length}_{plot_for}.png"),
             bbox_inches="tight")
         plt.show()
 
