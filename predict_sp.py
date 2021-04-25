@@ -3,7 +3,6 @@ import logging
 import os
 
 import numpy as np
-from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import GaussianNB
@@ -11,6 +10,7 @@ from sklearn.neighbors import KNeighborsClassifier
 
 from prediction.classifier import Classifier
 from prediction.custom_formatter import CustomFormatter
+from prediction.keras_classifier import KerasClassifier
 from prediction.settings import LOGGING_LEVEL, POSITIONS_AMINO_ACIDS, \
     FEATURES_AMINO_ACIDS, FEATURES_AMINO_ACIDS_LENGTH
 
@@ -21,16 +21,6 @@ parser.add_argument("--train-set", dest="train_set",
                     help="path to training data set")
 parser.add_argument("--out-dir", dest="out_dir", type=str, required=True,
                     help="path to output dir")
-parser.add_argument("--classifier", dest="classifier", type=str, required=True,
-                    help="sklearn classifier")
-parser.add_argument("--trained-model", dest="trained_model",
-                    type=str,
-                    help="path to a trained model set")
-parser.add_argument("--number-features", dest="feature_length", required=True,
-                    type=int, help="number of features that need to be used")
-parser.add_argument("--classify-features", dest="classify_features",
-                    action="store_true", default=False,
-                    help="train based on the features of an amino acid")
 
 logger = logging.getLogger(__name__)
 logger.setLevel(LOGGING_LEVEL)
@@ -41,7 +31,7 @@ ch.setFormatter(CustomFormatter())
 logger.addHandler(ch)
 
 CLASSIFIERS = {
-    "svc": svm.SVC(kernel="linear"),
+    # "svc": svm.SVC(kernel="linear"),
     "rfc": RandomForestClassifier(n_jobs=-1,
                                   random_state=0,
                                   max_depth=2),
@@ -50,11 +40,9 @@ CLASSIFIERS = {
     "gnb": GaussianNB()
 }
 
-AVAIL_CLASSIFIERS = [
-    "'svc' (C-Support Vector Classification)",
-    "'rfc' (RandomForestClassifier)",
-    "'knc' (KNeighborsClassifier)",
-    "'gnb' (GaussianNB)"
+FEATURES_LENGTHS = [
+    30,
+    50
 ]
 
 
@@ -63,14 +51,6 @@ def parse_args(parser):
 
     if not os.path.exists(args.train_set):
         raise FileNotFoundError(f"{args.train_set} does not exist")
-
-    if not args.classifier and not os.path.exists(args.trained_model):
-        raise FileNotFoundError(f"{args.trained_model} does not exist")
-
-    if not args.trained_model and args.classifier.lower() not in CLASSIFIERS:
-        avail_classifiers = ', '.join(AVAIL_CLASSIFIERS)
-        raise ValueError(
-            f"Choose one of the following classifiers: {avail_classifiers}")
 
     if not os.path.exists(args.out_dir):
         os.mkdir(args.out_dir)
@@ -135,35 +115,123 @@ def get_data(seqs, feature_length, classify_features):
 
 
 def get_classifier(features_train, labels_train, features_benchmark,
-                   labels_benchmark, args):
+                   labels_benchmark, out_dir, cfr, feature_length,
+                   classify_features=False):
     return Classifier(features_train, labels_train,
                       features_benchmark,
-                      labels_benchmark, args.out_dir,
-                      CLASSIFIERS.get(args.classifier.lower()),
-                      args.classify_features,
-                      feature_length=args.feature_length)
+                      labels_benchmark, out_dir,
+                      CLASSIFIERS.get(cfr.lower()),
+                      classify_features,
+                      feature_length=feature_length)
+
+
+def get_keras_classifier(features_train, labels_train, features_benchmark,
+                         labels_benchmark, out_dir, feature_length,
+                         classify_features=False):
+    return KerasClassifier(features_train, labels_train,
+                           features_benchmark,
+                           labels_benchmark, out_dir,
+                           classify_features,
+                           feature_length=feature_length)
+
+
+def models_positions(input_data, out_dir):
+    for cfr in CLASSIFIERS.keys():
+        for feature_length in FEATURES_LENGTHS:
+            classifier = get_classifier(input_data[feature_length]["False"][0],
+                                        input_data[feature_length]["False"][2],
+                                        input_data[feature_length]["False"][1],
+                                        input_data[feature_length]["False"][3],
+                                        out_dir, cfr, feature_length)
+
+            classifier.train()
+            classifier.save_classifier()
+            classifier.predict()
+
+            classifier.print_performance_and_save()
+            classifier.plot_confusion_matrix_and_save(plot_for="train",
+                                                      plot_img=False)
+            classifier.plot_confusion_matrix_and_save(plot_for="test",
+                                                      plot_img=False)
+
+    for feature_length in FEATURES_LENGTHS:
+        keras_classifier = get_keras_classifier(
+            input_data[feature_length]["False"][0],
+            input_data[feature_length]["False"][2],
+            input_data[feature_length]["False"][1],
+            input_data[feature_length]["False"][3],
+            out_dir, feature_length,
+            classify_features=False)
+
+        keras_classifier.train()
+        keras_classifier.save_classifier()
+        keras_classifier.predict()
+
+        keras_classifier.save_performance()
+        keras_classifier.plot_confusion_matrix_and_save(plot_img=False)
+
+
+def model_features(input_data, out_dir):
+    for cfr in CLASSIFIERS.keys():
+        for feature_length in FEATURES_LENGTHS:
+            classifier = get_classifier(input_data[feature_length]["True"][0],
+                                        input_data[feature_length]["True"][2],
+                                        input_data[feature_length]["True"][1],
+                                        input_data[feature_length]["True"][3],
+                                        out_dir, cfr, feature_length,
+                                        classify_features=True)
+
+            classifier.train()
+            classifier.save_classifier()
+            classifier.predict()
+            classifier.print_performance_and_save()
+
+            classifier.plot_confusion_matrix_and_save(plot_for="train",
+                                                      plot_img=False)
+            classifier.plot_confusion_matrix_and_save(plot_for="test",
+                                                      plot_img=False)
+
+    for feature_length in FEATURES_LENGTHS:
+        keras_classifier = get_keras_classifier(
+            input_data[feature_length]["True"][0],
+            input_data[feature_length]["True"][2],
+            input_data[feature_length]["True"][1],
+            input_data[feature_length]["True"][3],
+            out_dir, feature_length,
+            classify_features=True)
+
+        keras_classifier.train()
+        keras_classifier.save_classifier()
+        keras_classifier.predict()
+
+        keras_classifier.save_performance()
+        keras_classifier.plot_confusion_matrix_and_save(plot_img=False)
+
+
+def main():
+    args = parse_args(parser)
+
+    input_data = {}
+    for feature_length in FEATURES_LENGTHS:
+        input_data[feature_length] = {}
+        for boolean in [False, True]:
+            seqs_train = read_fasta(args.train_set, feature_length)
+            features, labels = get_data(seqs_train, feature_length,
+                                        boolean)
+
+            features_train, features_test, labels_train, labels_test = \
+                train_test_split(features, labels, test_size=.2)
+            input_data[feature_length][str(boolean)] = [features_train,
+                                                        features_test,
+                                                        labels_train,
+                                                        labels_test]
+
+    # use positions
+    models_positions(input_data, args.out_dir)
+
+    # use features of amino acids
+    model_features(input_data, args.out_dir)
 
 
 if __name__ == "__main__":
-    args = parse_args(parser)
-
-    seqs_train = read_fasta(args.train_set, args.feature_length)
-    features, labels = get_data(seqs_train, args.feature_length,
-                                args.classify_features)
-
-    features_train, features_test, labels_train, labels_test = \
-        train_test_split(features, labels, test_size=.2)
-
-    classifier = get_classifier(features_train, labels_train,
-                                features_test, labels_test, args)
-
-    if args.trained_model:
-        classifier.load_classifier(args.trained_model)
-    else:
-        classifier.train()
-        classifier.save_classifier()
-
-    classifier.predict()
-    classifier.print_performance_and_save()
-    classifier.plot_confusion_matrix_and_save(plot_for="train")
-    classifier.plot_confusion_matrix_and_save(plot_for="test")
+    main()

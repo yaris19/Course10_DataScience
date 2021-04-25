@@ -79,7 +79,7 @@ class Classifier:
         logger.info(f"\n{self.classification_report}")
         self.__save_classification_report()
 
-    def plot_confusion_matrix_and_save(self, plot_for):
+    def plot_confusion_matrix_and_save(self, plot_for, plot_img=True):
         logger.debug("Calculating confusion matrix")
         plot_for = plot_for.lower()
         if plot_for == "train":
@@ -102,7 +102,10 @@ class Classifier:
             self.out_dir,
             f"confusion_matrix_{self.feature_length}_{plot_for}.png"),
             bbox_inches="tight")
-        plt.show()
+        if plot_img:
+            plt.show()
+
+        plt.clf()
 
     def __save_classification_report(self):
         with open(os.path.join(
