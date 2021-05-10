@@ -107,7 +107,7 @@ class KerasClassifier:
                                        [np.argmax(x) for x in
                                         self.predictions])
         sns.heatmap(conf_matrix, annot=True, cmap="rocket", fmt='d',
-                    xticklabels=['cat', 'dog'], yticklabels=['cat', 'dog'])
+                    xticklabels=['NO_SP', 'SP'], yticklabels=['NO_SP', 'SP'])
         plt.title("Confusion matrix for test set")
 
         plt.savefig(os.path.join(
